@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #define LINE_LENGTH 82
-#define ERROR -1
+#define NULL -1
 #define SUCCESS 1
 #define MEMORY_ERROR 2
 
@@ -38,12 +38,12 @@ int pre_assembler_process(FILE* source_file, FILE* dest_file, Mcro** marcos_list
         if(sscanf(line, "%s", first_word) == 1){
             if (line[strlen(line) - 1] != '\n' && !feof(source_file)) {
             printf("Error - line %d exceeded %d chars", line_count, LINE_LENGTH);
-            return ERROR;
+            return NULL;
             }   
 
         if(strcmp(first_word, "mcro") == 0){
-            if(add_macro(source_file, marcos_list, line, &line_count) == ERROR){
-                return ERROR;
+            if(add_macro(source_file, marcos_list, line, &line_count) == NULL){
+                return NULL;
             }
         }
         else if((macro = search_macro(first_word, *marcos_list)) != NULL){
@@ -72,16 +72,16 @@ int add_macro(FILE* source_file, Mcro** marcos_list, char* line, int* line_count
 
     if(word_count > 1){
         printf("Error - extra chars in macro defenition, line: %d", *line_count);
-        return ERROR;
+        return NULL;
     }
     if(word_count < 1){
         printf("Error - missing macro name, line %d", *line_count);
-        return ERROR;
+        return NULL;
     }
 
     if(search_command(temp_name) == SUCCESS){
         printf("Error - macro name can not be an command name, line %d", *line_count);
-        return ERROR;
+        return NULL;
     }
 
 
@@ -102,12 +102,12 @@ int add_macro(FILE* source_file, Mcro** marcos_list, char* line, int* line_count
         if(word_count > 0){
         if (file_line[strlen(file_line) - 1] != '\n' && !feof(source_file)) {
             printf("Error - line %d exceeded %d chars", *line_count, LINE_LENGTH);
-            return ERROR;
+            return NULL;
         }
         if (strcmp(first_word, "mcroend") == 0) {
             if(word_count > 1){
             printf("Error - extra chars in macro end, line: %d", *line_count);
-            return ERROR;
+            return NULL;
         }
             break; 
         }
