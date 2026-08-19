@@ -5,14 +5,6 @@
 
 
 
-typedef struct Command{
-    int opcode;
-    int funct;
-    char command_type;
-    char command_name[5];
-    int opperands_qnt;
-} Command;
-
 
 static const Command commands_table[] = 
 {
@@ -47,13 +39,13 @@ static const Command commands_table[] =
 };
 
 
-Command* search_command(char search_str[5])
+Command* search_command(char* search_str)
 {
     int i;
 
     for(i = 0; i < COMMANDS_QNT; i++){
         if(strcmp(commands_table[i].command_name, search_str) == 0){
-            return &(commands_table[i]);
+            return (Command*)&(commands_table[i]);
         }
     }
     return NULL;

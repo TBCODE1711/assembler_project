@@ -1,15 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#define DATA 2
-
-typedef struct Symbol{
-    char label[32];
-    int address;
-    int command_type;
-    int visibility;
-    struct Symbol* next_symbol;
-} Symbol;
+#include "symbols_manager.h"
 
 
 Symbol* search_label(Symbol* head, char* search_STR)

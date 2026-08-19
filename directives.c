@@ -2,15 +2,17 @@
 #include <string.h>
 #include <stdlib.h>
 #include "directives.h"
-#define DIRECTIVE_LENGTH 7
 
 
 Directive directives_table[] = {
-    {".db", 1},
-    {".dh", 2},
-    {".dw", 4},
-    {".asciz", 1} 
+    {".db", 1, DIR_DB},
+    {".dh", 2, DIR_DH},
+    {".dw", 4, DIR_DW},
+    {".asciz", 1, DIR_ASCIZ},
+    {".entry", 0, DIR_ENTRY},
+    {".extern", 0, DIR_EXTERN}
 };
+
 
 Directive* search_directive(char* search_name)
 {

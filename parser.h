@@ -6,7 +6,6 @@
 #include "encoder.h"
 #include "directives.h"
 
-#define INSTRUCTION_LENGTH 3
 #define MAX_REG_QNT 3
 
 typedef enum {
@@ -31,5 +30,8 @@ typedef struct As_Line {
     LineType line_type;
     struct As_Line* next_line;
 } As_Line;
+
+
+As_Line* parser(const char* line, int line_number, const char* file_name);
 
 #endif
