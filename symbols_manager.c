@@ -3,20 +3,24 @@
 #include <stdlib.h>
 #include "symbols_manager.h"
 
+static Symbol* head = NULL;
 
-Symbol* search_label(Symbol* head, char* search_STR)
+
+Symbol* search_label(char* search_STR)
 {
-    while(head != NULL){
-        if(strcmp(head->label, search_STR) == 0){
-            return head;
+    Symbol* temp = head;
+
+    while(temp != NULL){
+        if(strcmp(temp->label, search_STR) == 0){
+            return temp;
         }
 
-        head = head->next_symbol;
+        temp = temp->next_symbol;
     }
     return NULL;
 }
 
-Symbol* add_label(Symbol* head, char* label, int address, int command_type, int visibility)
+Symbol* add_label(char* label, int address, int command_type, int visibility)
 {   
     Symbol* temp = head; 
 
@@ -28,7 +32,8 @@ Symbol* add_label(Symbol* head, char* label, int address, int command_type, int 
     new_symbol->next_symbol = NULL;
 
     if(temp == NULL){
-        return new_symbol;
+        head = new_symbol;
+        return head;
     }
 
     while(temp->next_symbol != NULL){
@@ -40,17 +45,41 @@ Symbol* add_label(Symbol* head, char* label, int address, int command_type, int 
 
 }
 
-void update_data_address(Symbol* head, int icf)
+void update_data_address(int icf)
 {
-    while(head != NULL){
-        if(head->command_type == DATA){
-            head->address += icf;
+    Symbol* temp = head;
+    while(temp != NULL){
+        if(temp->command_type == DATA){
+            temp->address += icf;
         }
-        head = head->next_symbol;
+        temp = temp->next_symbol;
     }
 }
 
-void free_list(Symbol* head)
+
+Symbol* search_entry_label(Symbol* current_label)
+{
+    if(head == NULL){
+        return NULL;
+    }
+    if(current_label == NULL){
+        current_label = head;
+    }
+
+    else{
+        current_label = current_label->next_symbol;
+    }
+
+    while(current_label != NULL){
+        if(current_label->visibility == ENTRY){
+            return current_label;
+        }
+        current_label = current_label->next_symbol;
+    }
+    return NULL;
+}
+
+void free_list()
 {
     while(head != NULL){
         Symbol* temp = head->next_symbol;

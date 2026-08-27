@@ -1,7 +1,11 @@
 /* encoder.h */
 #ifndef ENCODER_H
 #define ENCODER_H
-#define COMMAND_LENGTH 5
+
+#include "globals.h"
+typedef struct as_line AsLine;
+
+
 #define COMMANDS_QNT 27
 #define R_ARITHMETIC_QNT 3
 #define R_COPY_QNT 2
@@ -18,7 +22,9 @@
 #define CALL_OPCODE 32
 #define HLT_OPCODE 63
 
-typedef struct Command {
+
+
+typedef struct command {
     int opcode;
     int funct;
     char command_type;
@@ -26,8 +32,10 @@ typedef struct Command {
     int opperands_qnt;
 } Command;
 
-
 Command* search_command(char *search_str);
-void convert_command(char command_type, )
-
+void convert_command(AsLine* current_line, int* ic);
+void convert_directive(AsLine* current_line, int* dc);
+void update_label_binary(AsLine* current_line, int label_address, int* ic);
+const unsigned int* get_code_image();
+const unsigned char* get_data_image();
 #endif

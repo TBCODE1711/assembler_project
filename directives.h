@@ -1,7 +1,8 @@
 #ifndef DIRECTIVES_H
 #define DIRECTIVES_H
 
-#define DIRECTIVE_LENGTH 10
+#include "globals.h"
+
 #define DB_LENGTH 8
 #define DB_MIN -128
 #define DB_MAX 127
@@ -10,8 +11,7 @@
 #define DW_MIN -2147483648
 #define DW_MAX 2147483647
 
-
-typedef enum{
+typedef enum {
     DIR_DB,
     DIR_DH,
     DIR_DW,
@@ -20,7 +20,7 @@ typedef enum{
     DIR_EXTERN
 } DirectiveType;
 
-typedef struct {
+typedef struct directive {
     char directive_name[DIRECTIVE_LENGTH];
     int bytes_qnt;
     DirectiveType directive_type;

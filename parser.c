@@ -2,29 +2,35 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+
 #include "parser.h"
+#include "encoder.h"
+#include "directives.h"
+
+#define DECIMAL_BASE 10
 
 static LineType first_check(const char* line, int line_number);
-static const char* check_line_label(const char* line, As_Line* current_line);
-static void check_directive(const char* line, As_Line* current_line);
-static void check_command(const char* line, As_Line* current_line);
-static void d_parser(const char* line, As_Line* current_line, Directive* current_directive);
-static void asciz_parser(const char* line, As_Line* current_line);
-static void entry_extern_parser(const char* line, As_Line* current_line);
-static void check_R(const char* line, As_Line* current_line);
-static void check_I(const char* line, As_Line* current_line);
-static void check_J(const char* line, As_Line* current_line);
+static const char* check_line_label(const char* line, AsLine* current_line);
+static void check_directive(const char* line, AsLine* current_line);
+static void check_command(const char* line, AsLine* current_line);
+static void d_parser(const char* line, AsLine* current_line);
+static void asciz_parser(const char* line, AsLine* current_line);
+static void entry_extern_parser(const char* line, AsLine* current_line);
+static void check_R(const char* line, AsLine* current_line);
+static void check_I(const char* line, AsLine* current_line);
+static void check_J(const char* line, AsLine* current_line);
 static char* check_label(const char** line_ptr, char* label, int line_number);
 static const char* check_comma(const char* line, int line_number);
 static int check_reg(const char** line, int line_number);
 static int check_end_line(const char* line, int line_number);
+static int check_missing_ops(const char* line, int line_number);
 
 
-As_Line* parser(const char* line, int line_number, const char* file_name)
+AsLine* parser(const char* line, int line_number)
 {   
     LineType current_line_type;
     const char* temp;
-    As_Line* current_line = (As_Line*) malloc(sizeof(As_Line));
+    AsLine* current_line = (AsLine*) calloc(1, sizeof(AsLine));
 
     if(current_line == NULL){
         printf("Error in  line %d - memory allocation failed \n", line_number);
@@ -84,7 +90,7 @@ static LineType first_check(const char* line, int line_number)
 }
 
 
-static const char* check_line_label(const char* line, As_Line* current_line)
+static const char* check_line_label(const char* line, AsLine* current_line)
 {
     char temp_word[LINE_LENGTH];
     const char* temp_ptr = line;
@@ -98,6 +104,10 @@ static const char* check_line_label(const char* line, As_Line* current_line)
 
     temp_word[strlen(temp_word) - 1] = '\0';
 
+    if(check_missing_ops(line, current_line->line_number) == ERROR){
+        return NULL;
+    }
+
     if(check_label(&dummy_ptr, temp_word, current_line->line_number) == NULL){
         current_line->line_type = LINE_ERROR;
         return NULL;
@@ -110,18 +120,17 @@ static const char* check_line_label(const char* line, As_Line* current_line)
 }
 
 
-static void check_directive(const char* line, As_Line* current_line)
+static void check_directive(const char* line, AsLine* current_line)
 {
     char temp_word[LINE_LENGTH];
-    Directive* current_directive;
 
     sscanf(line, "%s", temp_word);
 
     line += strlen(temp_word);
 
-    current_directive = search_directive(temp_word);
+    current_line->line_directive = search_directive(temp_word);
 
-    if(current_directive == NULL){
+    if(current_line->line_directive == NULL){
         printf("Error in line %d - iligal directive \n", current_line->line_number);
         current_line->line_type = LINE_ERROR;
     }   
@@ -133,11 +142,11 @@ static void check_directive(const char* line, As_Line* current_line)
             line++;
         }
 
-        switch(current_directive->directive_type){
+        switch(current_line->line_directive->directive_type){
             case DIR_DB:
             case DIR_DH:
             case DIR_DW:
-                d_parser(line, current_line, current_directive);
+                d_parser(line, current_line);
                 break;
 
             case DIR_ASCIZ:
@@ -155,7 +164,7 @@ static void check_directive(const char* line, As_Line* current_line)
     }
 }
 
-static void check_command(const char* line, As_Line* current_line)
+static void check_command(const char* line, AsLine* current_line)
 {
     char temp_word[LINE_LENGTH];
     Command* current_command;
@@ -200,7 +209,7 @@ static void check_command(const char* line, As_Line* current_line)
 
 
 
-static void d_parser(const char* line, As_Line* current_line, Directive* current_directive)
+static void d_parser(const char* line, AsLine* current_line)
 {   char* temp_ptr;
     long num;
     int i = 0;
@@ -212,7 +221,7 @@ static void d_parser(const char* line, As_Line* current_line, Directive* current
     }
 
     while((*line) != '\n' && (*line) != '\0'){
-        num = strtol(line, (char**) &temp_ptr, 10);
+        num = strtol(line, (char**) &temp_ptr, DECIMAL_BASE);
             
         if(line == temp_ptr){
             printf("Error in line %d - iligal char in directive defenition \n", current_line->line_number);
@@ -221,10 +230,10 @@ static void d_parser(const char* line, As_Line* current_line, Directive* current
         }
 
         
-        switch(current_directive->directive_type){
+        switch(current_line->line_directive->directive_type){
             case DIR_DB:
                     if(num < DB_MIN || num > DB_MAX){
-                        printf("Error in line %d - number exceeded mx size of DB: %d\n", current_line->line_number, DB_LENGTH);
+                        printf("Error in line %d - number exceeded mx size of DB: %d - %d\n", current_line->line_number, DB_MAX, DB_MIN);
                         current_line->line_type = LINE_ERROR;
                         return;
                     }
@@ -232,7 +241,7 @@ static void d_parser(const char* line, As_Line* current_line, Directive* current
 
             case DIR_DH:
                     if(num < DH_MIN || num > DH_MAX){
-                        printf("Error in line %d - number exceeded max size of DH: %d\n", current_line->line_number, DB_LENGTH);
+                        printf("Error in line %d - number exceeded max size of DH: %d - %d\n", current_line->line_number, DH_MAX, DH_MIN);
                         current_line->line_type = LINE_ERROR;
                         return;
                     }
@@ -240,7 +249,7 @@ static void d_parser(const char* line, As_Line* current_line, Directive* current
 
             case DIR_DW:
                     if(num < DW_MIN || num > DW_MAX){
-                        printf("Error in line %d - number exceeded max size of DW", current_line->line_number);
+                        printf("Error in line %d - number exceeded max size of DW: %d - %ld", current_line->line_number, DW_MAX, DW_MIN);
                         current_line->line_type = LINE_ERROR;
                         return;
                     }
@@ -252,6 +261,7 @@ static void d_parser(const char* line, As_Line* current_line, Directive* current
 
         current_line->nums[i] = num;
         i++;
+        current_line->nums_qnt++;
         line = temp_ptr;
 
         while(isspace(*line)){
@@ -275,7 +285,7 @@ static void d_parser(const char* line, As_Line* current_line, Directive* current
 
 
 
-static void asciz_parser(const char* line, As_Line* current_line)
+static void asciz_parser(const char* line, AsLine* current_line)
 {
     int i = 0;
 
@@ -316,12 +326,17 @@ static void asciz_parser(const char* line, As_Line* current_line)
 }
 
 
-static void entry_extern_parser(const char* line, As_Line* current_line)
+static void entry_extern_parser(const char* line, AsLine* current_line)
 {
     char temp_word[LABEL_LENGTH];
 
         while(isspace(*line)){
         line++;
+    }
+
+    if(check_missing_ops(line, current_line->line_number) == ERROR){
+        current_line->line_type = LINE_ERROR;
+        return;
     }
 
     if(check_label(&line, temp_word, current_line->line_number) != NULL){
@@ -342,7 +357,7 @@ static void entry_extern_parser(const char* line, As_Line* current_line)
 
 
 
-static void check_R(const char* line, As_Line* current_line)
+static void check_R(const char* line, AsLine* current_line)
 {
     int temp_reg;
     int i;
@@ -373,7 +388,7 @@ static void check_R(const char* line, As_Line* current_line)
 }
 
 
-static void check_I(const char* line, As_Line* current_line)
+static void check_I(const char* line, AsLine* current_line)
 {
     char temp_word[LABEL_LENGTH];
     char* temp_ptr;
@@ -397,6 +412,11 @@ static void check_I(const char* line, As_Line* current_line)
         }
 
         if((line = check_comma(line, current_line->line_number)) == NULL){
+            current_line->line_type = LINE_ERROR;
+            return;
+        }
+
+        if(check_missing_ops(line, current_line->line_number) == ERROR){
             current_line->line_type = LINE_ERROR;
             return;
         }
@@ -429,7 +449,7 @@ static void check_I(const char* line, As_Line* current_line)
             return;
         }
 
-        num = strtol(line, (char**) &temp_ptr, 10);
+        num = strtol(line, (char**) &temp_ptr, DECIMAL_BASE);
         
         if(line == temp_ptr){
             printf("Error in line %d - iligal immed number \n", current_line->line_number);
@@ -464,7 +484,7 @@ static void check_I(const char* line, As_Line* current_line)
 }
 
 
-static void check_J(const char* line, As_Line* current_line)
+static void check_J(const char* line, AsLine* current_line)
 {   
     char temp_word[LABEL_LENGTH];
 
@@ -477,6 +497,10 @@ static void check_J(const char* line, As_Line* current_line)
                 }
             }
             else{
+                if(check_missing_ops(line, current_line->line_number) == ERROR){
+                    current_line->line_type = LINE_ERROR;
+                    return;
+                }
 
                 if(check_label(&line, temp_word, current_line->line_number) == NULL){
                     current_line->line_type = LINE_ERROR;
@@ -497,6 +521,11 @@ static void check_J(const char* line, As_Line* current_line)
 
         case LA_OPCODE:
         case CALL_OPCODE:
+
+            if(check_missing_ops(line, current_line->line_number) == ERROR){
+            current_line->line_type = LINE_ERROR;
+            return;
+            }
 
             if(check_label(&line, temp_word, current_line->line_number) == NULL){
                 current_line->line_type = LINE_ERROR;
@@ -570,6 +599,10 @@ static const char* check_comma(const char* line, int line_number)
         line++;
     }
 
+    if(check_missing_ops(line, line_number) == ERROR){
+        return NULL;
+    }
+
     if((*line) != ','){
         printf("Error in line %d - missing comma \n", line_number);
         return NULL;
@@ -594,9 +627,13 @@ static int check_reg(const char** line, int line_number)
         (*line)++;
     }
 
+    if(check_missing_ops(*line, line_number) == ERROR){
+        return ERROR;
+    }
+
     if((**line) == '$'){
         
-        reg = strtol((*line) + 1, (char**) &temp_ptr, 10);
+        reg = strtol((*line) + 1, (char**) &temp_ptr, DECIMAL_BASE);
 
         if((*line) + 1!= temp_ptr){
             if(reg >= MIN_REG && reg <= MAX_REG){
@@ -629,110 +666,16 @@ static int check_end_line(const char* line, int line_number)
 }
 
 
-
-
-
-int main(void)
+static int check_missing_ops(const char* line, int line_number) 
 {
-    int i;
-    As_Line* result;
-    
-    /* Array of test descriptions */
-    char *descriptions[] = {
-        "1. Line length > 80 chars",
-        "2. Extraneous text at the end",
-        "3. Label length > 31 chars",
-        "4. Label starts with non-alpha",
-        "5. Label contains invalid chars",
-        "6. Label is a reserved word",
-        "7. Space before colon in label",
-        "8. Missing comma between operands",
-        "9. Leading comma before first operand",
-        "10. Trailing comma after last operand",
-        "11. Multiple consecutive commas",
-        "12. Invalid directive name",
-        "13a. .db out of bounds (> 127)",
-        "13b. .db out of bounds (< -128)",
-        "13c. .dh out of bounds (> 32767)",
-        "13d. .dw out of bounds (overflow)",
-        "14a. Invalid data type (float)",
-        "14b. Invalid data type (string/chars)",
-        "15a. .asciz missing closing quote",
-        "15b. .asciz missing opening quote",
-        "16a. .entry missing parameter",
-        "16b. .entry too many parameters",
-        "16c. .extern invalid label name",
-        "17. Invalid command name",
-        "18a. Wrong operand count (too few)",
-        "18b. Wrong operand count (too many)",
-        "19a. Register missing $",
-        "19b. Register out of bounds (> 31)",
-        "19c. Register out of bounds (< 0)",
-        "19d. Register invalid chars after $",
-        "20a. Immediate out of bounds (> 32767)",
-        "20b. Immediate out of bounds (< -32768)",
-        "20c. Immediate invalid type (chars)",
-        "21a. Wrong operand type (label instead of reg)",
-        "21b. Wrong operand type (reg instead of label in branch)"
-    };
-
-    /* Array of test inputs matching the descriptions */
-    char *tests[] = {
-        "MAIN: add $1, $2, $3 this line is intentionally made very very very very very very very long to exceed eighty characters",
-        "add $1, $2, $3 garbage",
-        "ThisLabelIsWayTooLongAndExceedsThirtyOneCharacters: add $1, $2, $3",
-        "1MAIN: add $1, $2, $3",
-        "MA@IN: add $1, $2, $3",
-        "add: add $1, $2, $3",
-        "MAIN : add $1, $2, $3",
-        "add $1 $2, $3",
-        "add ,$1, $2, $3",
-        "add $1, $2, $3,",
-        "add $1,,$2, $3",
-        ".invalid 5, 6",
-        ".db 300",
-        ".db -200",
-        ".dh 40000",
-        ".dw 5000000000",
-        ".db 5.5",
-        ".db abc",
-        ".asciz \"hello",
-        ".asciz hello\"",
-        ".entry",
-        ".entry MAIN, LOOP",
-        ".extern 1BADLABEL",
-        "invalidcmd $1, $2, $3",
-        "add $1, $2",
-        "add $1, $2, $3, $4",
-        "add 1, $2, $3",
-        "add $35, $2, $3",
-        "add $-1, $2, $3",
-        "add $A, $2, $3",
-        "addi $1, 50000, $2",
-        "addi $1, -50000, $2",
-        "addi $1, abc, $2",
-        "add $1, MAIN, $3",
-        "bne $1, $2, $3"
-    };
-
-    int num_tests = sizeof(tests) / sizeof(tests[0]);
-
-    for (i = 0; i < num_tests; i++) {
-        printf("--- Test %s ---\n", descriptions[i]);
-        printf("Input: %s\n", tests[i]);
-        
-        result = parser(tests[i], i + 1, "test.as");
-        
-        if (result != NULL && result->line_type == LINE_ERROR) {
-            printf("Result: PASSED (Error successfully caught)\n\n");
-        } else {
-            printf("Result: FAILED (Parser did not return LINE_ERROR)\n\n");
-        }
-        
-        if (result != NULL) {
-            free(result);
-        }
+    while(isspace(*line)){
+        line++;
     }
 
-    return 0;
+    if ((*line) == '\0' || (*line) == '\n') {
+        printf("Error in line %d - missing operand\n", line_number);
+        return ERROR;
+    }
+    return SUCCESS;
 }
+

@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#define LINE_LENGTH 82
-#define NULL -1
-#define SUCCESS 1
-#define MEMORY_ERROR 2
+
+#include "pre_assembler.h"
+#include "encoder.h"
+#include "directives.h"
+#include "globals.h"
+
 
 typedef struct Mcro_Line{
     char line[LINE_LENGTH];
@@ -19,34 +21,33 @@ typedef struct mcro{
 } Mcro;
 
 /* Function Prototypes */
-int pre_assembler_process(FILE* source_file, FILE* dest_file, Mcro** marcos_list);
-int add_macro(FILE* source_file, Mcro** marcos_list, char* line, int* line_count);
-Mcro* search_macro(char* search_name, Mcro* head);
-void replace_macro(FILE* dest_file, Mcro* macro);
-void free_macro_list(Mcro* head);
-int search_command(char* name);
+static Mcro* search_macro(char* search_name, Mcro* head);
+static int add_macro(FILE* source_file, Mcro** marcos_list, char* line, int* line_count);
+static void replace_macro(FILE* dest_file, Mcro* macro);
+static void free_macro_list(Mcro* head);
 
-int pre_assembler_process(FILE* source_file, FILE* dest_file, Mcro** marcos_list)
+
+int pre_assembler_process(FILE* source_file, FILE* dest_file)
 {
     char line[LINE_LENGTH];
     char first_word[LINE_LENGTH];
+    Mcro* macros_list = NULL;
     Mcro* macro;
-    int line_count = 0;
+    int line_count = 1;
 
     while(fgets(line, LINE_LENGTH, source_file) != NULL){
-        line_count++;
-        if(sscanf(line, "%s", first_word) == 1){
-            if (line[strlen(line) - 1] != '\n' && !feof(source_file)) {
-            printf("Error - line %d exceeded %d chars", line_count, LINE_LENGTH);
-            return NULL;
-            }   
+        if (strchr(line, '\n') != NULL) {
+            line_count++;
+        }
+
+        if(sscanf(line, "%s", first_word) == 1){   
 
         if(strcmp(first_word, "mcro") == 0){
-            if(add_macro(source_file, marcos_list, line, &line_count) == NULL){
-                return NULL;
+            if(add_macro(source_file, &macros_list, line, &line_count) == ERROR){
+                return ERROR;
             }
         }
-        else if((macro = search_macro(first_word, *marcos_list)) != NULL){
+        else if((macro = search_macro(first_word, macros_list)) != NULL){
             replace_macro(dest_file, macro);
         }
 
@@ -54,11 +55,16 @@ int pre_assembler_process(FILE* source_file, FILE* dest_file, Mcro** marcos_list
             fputs(line, dest_file);
         }
         }
+
+        else{
+            fputs(line, dest_file);
+        }
     }
+    free_macro_list(macros_list);
     return SUCCESS;
 }
 
-int add_macro(FILE* source_file, Mcro** marcos_list, char* line, int* line_count)
+static int add_macro(FILE* source_file, Mcro** marcos_list, char* line, int* line_count)
 {
     char temp_name[LINE_LENGTH];
     char file_line[LINE_LENGTH];
@@ -72,23 +78,28 @@ int add_macro(FILE* source_file, Mcro** marcos_list, char* line, int* line_count
 
     if(word_count > 1){
         printf("Error - extra chars in macro defenition, line: %d", *line_count);
-        return NULL;
+        return ERROR;
     }
     if(word_count < 1){
         printf("Error - missing macro name, line %d", *line_count);
-        return NULL;
+        return ERROR;
     }
 
-    if(search_command(temp_name) == SUCCESS){
+    if(search_command(temp_name) != NULL){
         printf("Error - macro name can not be an command name, line %d", *line_count);
-        return NULL;
+        return ERROR;
+    }
+
+    if(search_directive(temp_name) != NULL){
+        printf("Error - macro name can not be an directive name, line %d", *line_count);
+        return ERROR;
     }
 
 
     new_macro = (Mcro*) malloc(sizeof(Mcro));
     if (new_macro == NULL) {
     printf("Error: Memory allocation failed\n");
-    return MEMORY_ERROR;
+    return ERROR;
     }
 
     strcpy(new_macro->macro_name, temp_name);
@@ -98,16 +109,17 @@ int add_macro(FILE* source_file, Mcro** marcos_list, char* line, int* line_count
     while (fgets(file_line, LINE_LENGTH, source_file) != NULL) {
          Mcro_Line* new_line;
         word_count = sscanf(file_line, "%s %s", first_word, extra_word);
-        (*line_count)++;
-        if(word_count > 0){
-        if (file_line[strlen(file_line) - 1] != '\n' && !feof(source_file)) {
-            printf("Error - line %d exceeded %d chars", *line_count, LINE_LENGTH);
-            return NULL;
+
+        if (strchr(file_line, '\n') != NULL) {
+            (*line_count)++;
         }
+
+        if(word_count > 0){
+
         if (strcmp(first_word, "mcroend") == 0) {
             if(word_count > 1){
             printf("Error - extra chars in macro end, line: %d", *line_count);
-            return NULL;
+            return ERROR;
         }
             break; 
         }
@@ -115,7 +127,7 @@ int add_macro(FILE* source_file, Mcro** marcos_list, char* line, int* line_count
         new_line = (Mcro_Line*) malloc(sizeof(Mcro_Line));
         if (new_line == NULL) {
             printf("Error: Memory allocation failed\n");
-            return MEMORY_ERROR;
+            return ERROR;
             }
         strcpy(new_line->line, file_line);
         new_line->next_line = NULL;
@@ -137,7 +149,7 @@ int add_macro(FILE* source_file, Mcro** marcos_list, char* line, int* line_count
 }
 
 
-Mcro* search_macro(char* search_name, Mcro* head)
+static Mcro* search_macro(char* search_name, Mcro* head)
 {
     while(head != NULL){
         if(strcmp(head->macro_name, search_name) == 0){
@@ -149,7 +161,7 @@ Mcro* search_macro(char* search_name, Mcro* head)
     return NULL;
 }
 
-void replace_macro(FILE* dest_file, Mcro* macro)
+static void replace_macro(FILE* dest_file, Mcro* macro)
 {
     Mcro_Line* current_line = macro->macro_content;
 
@@ -160,7 +172,7 @@ void replace_macro(FILE* dest_file, Mcro* macro)
     }
 }
 
-void free_macro_list(Mcro* head)
+static void free_macro_list(Mcro* head)
 {
     Mcro* temp;
 

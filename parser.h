@@ -3,10 +3,9 @@
 #define PARSER_H
 
 #include "globals.h"
-#include "encoder.h"
 #include "directives.h"
+#include "encoder.h"
 
-#define MAX_REG_QNT 3
 
 typedef enum {
     LINE_EMPTY,
@@ -17,21 +16,21 @@ typedef enum {
     LINE_OK
 } LineType;
 
-typedef struct As_Line {
+struct as_line {
     Command* line_command;
     int registers[MAX_REG_QNT];
     int immed_num;
     char defined_lable[LINE_LENGTH];
-    int directive_type;
+    Directive* line_directive; 
     char str[LINE_LENGTH];
     int nums[LINE_LENGTH / 2];
+    int nums_qnt;
     char target_label[LINE_LENGTH];
     int line_number;
     LineType line_type;
-    struct As_Line* next_line;
-} As_Line;
+    struct as_line* next_line;
+};
 
-
-As_Line* parser(const char* line, int line_number, const char* file_name);
+AsLine* parser(const char* line, int line_number);
 
 #endif
